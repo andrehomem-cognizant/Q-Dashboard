@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F0F8F5;
+    }
+    .loader {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-top: 4px solid #00B14F;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .clickable-row { cursor: pointer; }
+    .clickable-row:hover { background-color: #F3F4F6; }
+    .details-row { display: none; }
+    .details-row.show { display: table-row; }
+    .tab-button { transition: all 0.2s; }
+    .tab-button.active { color: #00B14F; border-color: #00B14F; }
+    .sortable-header { cursor: pointer; user-select: none; }
+    .sortable-header:hover { color: #00B14F; }
+    .sort-arrow { margin-left: 6px; color: #00B14F; font-size: 1.1em; }
+  </style>
+</head>
+<body class="text-gray-800">
+  <div id="app" class="p-4 md:p-8 max-w-full mx-auto px-4 md:px-8">
+
+    <header class="mb-8">
+      <h1 class="text-4xl font-extrabold" style="color: #00B14F;">🏆 Quality & Reworks Dashboard</h1>
+      <p class="text-gray-500 mt-2">Use the filters below to analyze the quality data.</p>
+    </header>
+
+    <div class="bg-white p-4 rounded-xl shadow-sm mb-8 border border-gray-200">
+      <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4 items-end">
+        <div>
+          <label for="startDate" class="block text-sm font-medium text-gray-600">Start Date</label>
+          <input type="date" id="startDate" class="mt-1 block w-full bg-gray-50 border-gray-300 text-gray-800 rounded-lg shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm">
+        </div>
+        <div>
+          <label for="endDate" class="block text-sm font-medium text-gray-600">End Date</label>
+          <input type="date" id="endDate" class="mt-1 block w-full bg-gray-50 border-gray-300 text-gray-800 rounded-lg shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm">
+        </div>
+        <div>
+          <label for="market" class="block text-sm font-medium text-gray-600">Market</label>
+          <select id="market" class="mt-1 block w-full bg-gray-50 border-gray-300 text-gray-800 rounded-lg shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"></select>
+        </div>
+        <div>
+          <label for="requestType" class="block text-sm font-medium text-gray-600">Menu Request Type</label>
+          <select id="requestType" class="mt-1 block w-full bg-gray-50 border-gray-300 text-gray-800 rounded-lg shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"></select>
+        </div>
+        <div>
+          <label for="supportType" class="block text-sm font-medium text-gray-600">Support Type</label>
+          <select id="supportType" class="mt-1 block w-full bg-gray-50 border-gray-300 text-gray-800 rounded-lg shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"></select>
+        </div>
+        <div>
+          <label for="errorType" class="block text-sm font-medium text-gray-600">Type of Error</label>
+          <select id="errorType" class="mt-1 block w-full bg-gray-50 border-gray-300 text-gray-800 rounded-lg shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm">
+            <option>All</option>
+            <option>Critical Errors</option>
+            <option>Non-Critical Errors</option>
+          </select>
+        </div>
+        <button id="applyFilters" class="w-full text-white font-bold py-2 px-4 rounded-lg hover:opacity-90 transition duration-300" style="background-color: #00B14F;">Apply Filters</button>
+      </div>
+    </div>
+
+    <div id="loader" class="hidden flex justify-center items-center my-16">
+      <div class="loader"></div>
+      <p class="ml-4 text-gray-600 font-semibold">Loading Data...</p>
+    </div>
+
+    <div id="errorMessage" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6" role="alert">
+      <strong class="font-bold">Error!</strong>
+      <span class="block sm:inline" id="errorText"></span>
+    </div>
+
+    <div id="dashboardTabs">
+      <div class="flex border-b border-gray-200 mb-6">
+        <button id="tabAudit" class="tab-button active text-lg font-semibold py-2 px-4 border-b-2">Audit Results</button>
+        <button id="tabRework" class="tab-button text-lg font-semibold py-2 px-4 border-b-2 border-transparent">Rework Results</button>
+      </div>
+
+      <div id="auditContent" class="space-y-8"></div>
+      <div id="reworkContent" class="space-y-8 hidden"></div>
+    </div>
+
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      let fullDashboardData = null;
+      let sortState = {};
+
+      const applyBtn = document.getElementById('applyFilters');
+      const loader = document.getElementById('loader');
+      const auditContentDiv = document.getElementById('auditContent');
+      const reworkContentDiv = document.getElementById('reworkContent');
+      const tabAudit = document.getElementById('tabAudit');
+      const tabRework = document.getElementById('tabRework');
+
+      function initialize() {
+        showLoader();
+        setupTabs();
+        google.script.run.withSuccessHandler(setupFilters).withFailureHandler(showError).getFilterOptions();
+      }
+
+      function setupTabs() {
+        tabAudit.addEventListener('click', () => {
+          tabAudit.classList.add('active'); tabRework.classList.remove('active');
+          auditContentDiv.classList.remove('hidden'); reworkContentDiv.classList.add('hidden');
+        });
+        tabRework.addEventListener('click', () => {
+          tabRework.classList.add('active'); tabAudit.classList.remove('active');
+          reworkContentDiv.classList.remove('hidden'); auditContentDiv.classList.add('hidden');
+        });
+      }
+
+      function setupFilters(options) {
+        if (!options || options.error) { showError({ message: options?.error || 'Failed to load filter options.' }); return; }
+        populateSelect('market', options.markets);
+        populateSelect('requestType', options.requestTypes);
+        populateSelect('supportType', options.supportTypes);
+        fetchData();
+      }
+
+      function fetchData() {
+        showLoader();
+        sortState = {};
+        const filters = {
+          startDate: document.getElementById('startDate').value,
+          endDate: document.getElementById('endDate').value,
+          market: document.getElementById('market').value,
+          requestType: document.getElementById('requestType').value,
+          supportType: document.getElementById('supportType').value,
+          errorType: document.getElementById('errorType').value
+        };
+        google.script.run.withSuccessHandler(renderDashboard).withFailureHandler(showError).getDashboardData(filters);
+      }
+
+      function renderDashboard(data) {
+        hideLoader();
+        if (!data || data.error) { showError({ message: data?.error || 'An unknown error occurred.' }); return; }
+        fullDashboardData = data;
+        renderAllComponents();
+      }
+
+      function renderAllComponents() {
+        if (!fullDashboardData) return;
+
+        auditContentDiv.innerHTML = '';
+        reworkContentDiv.innerHTML = '';
+
+        // RENDER AUDIT TAB
+        if (fullDashboardData.auditDataExists) {
+          const sortedMarketData = sortTableData('auditsByMarket', [...fullDashboardData.audits.byMarket]);
+          const sortedCreationData = sortTableData('auditsByCreation', [...fullDashboardData.audits.byRequestType.creation]);
+          const sortedUpdateData = sortTableData('auditsByUpdate', [...fullDashboardData.audits.byRequestType.update]);
+          const sortedAgentData = sortTableData('performanceByAgent', [...fullDashboardData.audits.byAgent]);
+
+          auditContentDiv.appendChild(createAuditSummaryCards(fullDashboardData.audits.byMarket));
+          
+          const auditGrid = document.createElement('div');
+          auditGrid.className = 'grid grid-cols-1 lg:grid-cols-2 gap-8';
+          auditContentDiv.appendChild(createSectionHeader('Audit Results by Market'));
+          auditGrid.appendChild(createTable(
+            'auditsByMarket',
+            ['Market', 'Cases Audited', 'Quality Score', 'Cases w/ Critical', 'Cases w/ Non-Critical'],
+            sortedMarketData,
+            ['market', 'casesAudited', 'qualityScore', 'casesWithCritical', 'casesWithNonCritical']
+          ));
+          auditGrid.appendChild(createBarChart('auditCriteriaChart', 'Error Breakdown by Criteria', fullDashboardData.audits.criteria));
+          auditContentDiv.appendChild(auditGrid);
+
+          auditContentDiv.appendChild(createSectionHeader('Audit Results by Menu Request Type'));
+          const requestTypeGrid = document.createElement('div');
+          requestTypeGrid.className = 'grid grid-cols-1 lg:grid-cols-2 gap-8';
+          const creationDiv = document.createElement('div');
+          const creationHeader = document.createElement('h3');
+          creationHeader.className = 'text-xl font-semibold text-gray-800 mb-4';
+          creationHeader.textContent = `Menu Creation (Overall Quality: ${fullDashboardData.audits.byRequestType.creationOverall.quality})`;
+          creationDiv.appendChild(creationHeader);
+          creationDiv.appendChild(createTable('auditsByCreation', ['Country', 'Cases Audited', 'Quality', 'Cases w/ Critical', 'Cases w/ Non-Critical'], sortedCreationData, ['country', 'casesAudited', 'quality', 'casesWithCritical', 'casesWithNonCritical']));
+          requestTypeGrid.appendChild(creationDiv);
+
+          const updateDiv = document.createElement('div');
+          const updateHeader = document.createElement('h3');
+          updateHeader.className = 'text-xl font-semibold text-gray-800 mb-4';
+          updateHeader.textContent = `Menu Update (Overall Quality: ${fullDashboardData.audits.byRequestType.updateOverall.quality})`;
+          updateDiv.appendChild(updateHeader);
+          updateDiv.appendChild(createTable('auditsByUpdate', ['Country', 'Cases Audited', 'Quality', 'Cases w/ Critical', 'Cases w/ Non-Critical'], sortedUpdateData, ['country', 'casesAudited', 'quality', 'casesWithCritical', 'casesWithNonCritical']));
+          requestTypeGrid.appendChild(updateDiv);
+          auditContentDiv.appendChild(requestTypeGrid);
+
+          if (fullDashboardData.audits.byAgent && fullDashboardData.audits.byAgent.length > 0) {
+            auditContentDiv.appendChild(createSectionHeader('Performance by Agent'));
+            auditContentDiv.appendChild(createAgentPerformanceTable(sortedAgentData, fullDashboardData.audits.agentTasks));
+          }
+        } else {
+          auditContentDiv.appendChild(createNoDataCard('No Audit data found for the selected filters.'));
+        }
+
+        // RENDER REWORK TAB
+        if (fullDashboardData.reworkDataExists) {
+          const sortedReworkData = sortTableData('reworkResults', [...fullDashboardData.reworks.metrics]);
+
+          reworkContentDiv.appendChild(createReworkSummaryCards(fullDashboardData.reworks.metrics));
+          const reworkGrid = document.createElement('div');
+          reworkGrid.className = 'grid grid-cols-1 lg:grid-cols-2 gap-8';
+          reworkContentDiv.appendChild(createSectionHeader('Rework Details'));
+          reworkGrid.appendChild(createBarChart('reworkCriteriaChart', 'Error Breakdown by Criteria (Valid Reworks)', fullDashboardData.reworks.criteria));
+          reworkGrid.appendChild(createTable('reworkResults', ['Market', 'Valid Reworks', 'Invalid Reworks', 'Valid w/ Critical', 'Valid w/ Non-Critical'], sortedReworkData, ['market', 'validReworks', 'invalidReworks', 'validWithCritical', 'validWithNonCritical']));
+          reworkContentDiv.appendChild(reworkGrid);
+
+          if (fullDashboardData.reworks.byAgent && fullDashboardData.reworks.byAgent.length > 0) {
+              const sortedReworkAgentData = sortTableData('reworkPerformanceByAgent', [...fullDashboardData.reworks.byAgent]);
+              reworkContentDiv.appendChild(createSectionHeader('Performance by Agent'));
+              reworkContentDiv.appendChild(createReworkAgentPerformanceTable(sortedReworkAgentData, fullDashboardData.reworks.agentTasks));
+          }
+
+        } else {
+          reworkContentDiv.appendChild(createNoDataCard('No Rework data found for the selected filters.'));
+        }
+      }
+
+      function handleSortClick(tableId, key) {
+        if (!key) return;
+        const currentSort = sortState[tableId];
+        let newOrder = 'desc';
+        if (currentSort && currentSort.key === key && currentSort.order === 'desc') {
+          newOrder = 'asc';
+        }
+        sortState[tableId] = { key, order: newOrder };
+        renderAllComponents();
+      }
+
+      function sortTableData(tableId, data) {
+        const sortInfo = sortState[tableId];
+        if (!sortInfo) return data;
+        data.sort((a, b) => {
+          const valA = a[sortInfo.key]; const valB = b[sortInfo.key];
+          let cleanA = String(valA).replace(/%/g, '').trim(); let cleanB = String(valB).replace(/%/g, '').trim();
+          const isNumeric = !isNaN(parseFloat(cleanA)) && isFinite(cleanA) && !isNaN(parseFloat(cleanB)) && isFinite(cleanB);
+          let comparison = 0;
+          if (isNumeric) { comparison = parseFloat(cleanA) - parseFloat(cleanB); } 
+          else { comparison = String(valA).localeCompare(String(valB), undefined, { numeric: true }); }
+          return sortInfo.order === 'asc' ? comparison : -comparison;
+        });
+        return data;
+      }
+
+      // --- UI HELPER FUNCTIONS ---
+      function showLoader() { document.getElementById('loader').classList.remove('hidden'); applyBtn.disabled = true; applyBtn.textContent = 'Loading...'; }
+      function hideLoader() { document.getElementById('loader').classList.add('hidden'); applyBtn.disabled = false; applyBtn.textContent = 'Apply Filters'; }
+      function showError(error) { hideLoader(); const errorDiv = document.getElementById('errorMessage'); document.getElementById('errorText').textContent = error.message; errorDiv.classList.remove('hidden'); }
+      function populateSelect(elementId, options) { const select = document.getElementById(elementId); select.innerHTML = ''; options.forEach(opt => { const option = document.createElement('option'); option.value = opt; option.textContent = opt; select.appendChild(option); }); }
+      function createSectionHeader(title) { const h2 = document.createElement('h2'); h2.className = 'text-2xl font-semibold text-gray-800 mt-8 mb-4 border-b-2 border-gray-200 pb-2'; h2.textContent = title; return h2; }
+      function createNoDataCard(message) { const div = document.createElement('div'); div.className = 'bg-white p-6 rounded-xl shadow-sm text-center text-gray-500 border border-gray-200'; div.textContent = message; return div; }
+
+      function createSummaryCard(title, value, icon) {
+        return `<div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex items-start space-x-4">
+                  <div class="flex-shrink-0">${icon}</div>
+                  <div>
+                    <p class="text-sm font-semibold text-gray-500">${title}</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-1">${value}</p>
+                  </div>
+                </div>`;
+      }
+
+      function createAuditSummaryCards(data) {
+        const totalCases = data.reduce((sum, item) => sum + item.casesAudited, 0); const totalCriticalCases = data.reduce((sum, item) => sum + item.casesWithCritical, 0); const totalNonCriticalCases = data.reduce((sum, item) => sum + item.casesWithNonCritical, 0); const overallQuality = totalCases > 0 ? (((totalCases - totalCriticalCases) / totalCases) * 100).toFixed(2) + '%' : 'N/A';
+        const container = document.createElement('div'); container.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8';
+        container.innerHTML = createSummaryCard('Total Audits', totalCases, '<svg class="h-8 w-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C6.095 4.01 5.25 4.973 5.25 6.108V18.75c0 1.243.87 2.25 1.969 2.25H18A2.25 2.25 0 0020.25 18.75V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08" /></svg>') + createSummaryCard('Overall Quality', overallQuality, '<svg class="h-8 w-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>') + createSummaryCard('Total Cases w/ Criticals', totalCriticalCases, '<svg class="h-8 w-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>') + createSummaryCard('Total Cases w/ Non-Criticals', totalNonCriticalCases, '<svg class="h-8 w-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>');
+        return container;
+      }
+
+      function createReworkSummaryCards(data) {
+        const totalValid = data.reduce((sum, item) => sum + item.validReworks, 0); const totalInvalid = data.reduce((sum, item) => sum + item.invalidReworks, 0); const totalReworks = totalValid + totalInvalid; const validWithCritical = data.reduce((sum, item) => sum + item.validWithCritical, 0);
+        const container = document.createElement('div'); container.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8';
+        container.innerHTML = createSummaryCard('Total Reworks', totalReworks, '<svg class="h-8 w-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C6.095 4.01 5.25 4.973 5.25 6.108V18.75c0 1.243.87 2.25 1.969 2.25H18A2.25 2.25 0 0020.25 18.75V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08" /></svg>') + createSummaryCard('Valid Reworks', totalValid, '<svg class="h-8 w-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75" /></svg>') + createSummaryCard('Invalid Reworks', totalInvalid, '<svg class="h-8 w-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>') + createSummaryCard('Valid w/ Criticals', validWithCritical, '<svg class="h-8 w-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>');
+        return container;
+      }
+
+      function createBarChart(canvasId, title, data) {
+        const container = document.createElement('div'); container.className = 'bg-white p-6 rounded-xl shadow-sm border border-gray-200';
+        const header = document.createElement('h3'); header.className = 'text-lg font-semibold text-gray-800 mb-4'; header.textContent = title;
+        const chartWrapper = document.createElement('div'); chartWrapper.className = 'relative h-[700px]';
+        const canvas = document.createElement('canvas'); canvas.id = canvasId; chartWrapper.appendChild(canvas);
+        container.appendChild(header); container.appendChild(chartWrapper);
+        const labels = data.map(d => d.criteria); const criticalData = data.map(d => d.critical); const nonCriticalData = data.map(d => d.nonCritical);
+        setTimeout(() => { new Chart(canvas.getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'Non-Critical', data: nonCriticalData, backgroundColor: '#34D399' }, { label: 'Critical', data: criticalData, backgroundColor: '#F87171' }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { stacked: true, ticks: { color: '#111827', stepSize: 1 }, grid: { color: '#E5E7EB' } }, y: { stacked: true, ticks: { color: '#111827', align: 'start' }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#111827' } } } } }); }, 0); return container;
+      }
+
+      function createTable(tableId, headers, dataRows, dataKeys) {
+        const tableContainer = document.createElement('div'); tableContainer.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto';
+        const table = document.createElement('table'); table.className = 'min-w-full';
+        const thead = document.createElement('thead'); thead.className = 'bg-gray-50';
+        let tr = document.createElement('tr');
+        headers.forEach((headerText, index) => {
+          const th = document.createElement('th'); const key = dataKeys ? dataKeys[index] : null;
+          th.className = 'px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider ' + (key ? 'sortable-header' : '');
+          th.textContent = headerText;
+          if (key && tableId) {
+            th.onclick = () => handleSortClick(tableId, key); const sortInfo = sortState[tableId];
+            if (sortInfo && sortInfo.key === key) { const arrow = document.createElement('span'); arrow.className = 'sort-arrow'; arrow.textContent = sortInfo.order === 'asc' ? '▲' : '▼'; th.appendChild(arrow); }
+          }
+          tr.appendChild(th);
+        });
+        thead.appendChild(tr);
+        const tbody = document.createElement('tbody'); tbody.className = 'divide-y divide-gray-200';
+        if (dataRows && dataRows.length > 0) {
+          dataRows.forEach(rowData => {
+            tr = document.createElement('tr');
+            if (tableId === 'performanceByAgent' || tableId === 'reworkPerformanceByAgent') {
+              tr.className = 'clickable-row';
+              tr.dataset.agentId = rowData.agentId;
+            }
+            dataKeys.forEach(key => {
+              const td = document.createElement('td');
+              td.className = 'px-6 py-4 text-sm text-gray-700';
+              td.textContent = rowData[key];
+              tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+          });
+        } else {
+          tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = headers.length; td.className = 'px-6 py-4 text-center text-gray-500'; td.textContent = 'No data available.'; tr.appendChild(td); tbody.appendChild(tr);
+        }
+        table.appendChild(thead); table.appendChild(tbody); tableContainer.appendChild(table); return tableContainer;
+      }
+
+      function createAgentPerformanceTable(agentData, taskData) {
+        const tableContainer = document.createElement('div');
+        tableContainer.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto';
+        const table = document.createElement('table');
+        table.className = 'min-w-full';
+        const thead = document.createElement('thead');
+        thead.className = 'bg-gray-50';
+        const headers = ['Agent ID', 'Cases Audited', 'Quality Score', 'Cases with Critical Errors', 'Cases with Non-Critical Errors'];
+        const dataKeys = ['agentId', 'casesAudited', 'qualityScore', 'casesWithCritical', 'casesWithNonCritical'];
+        const tableId = 'performanceByAgent';
+        let tr = document.createElement('tr');
+        headers.forEach((headerText, index) => {
+          const th = document.createElement('th'); const key = dataKeys[index];
+          th.className = 'px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sortable-header';
+          th.textContent = headerText; th.onclick = () => handleSortClick(tableId, key); const sortInfo = sortState[tableId];
+          if (sortInfo && sortInfo.key === key) { const arrow = document.createElement('span'); arrow.className = 'sort-arrow'; arrow.textContent = sortInfo.order === 'asc' ? '▲' : '▼'; th.appendChild(arrow); }
+          tr.appendChild(th);
+        });
+        thead.appendChild(tr);
+        const tbody = document.createElement('tbody');
+        tbody.className = 'divide-y divide-gray-200';
+        if (agentData && agentData.length > 0) {
+          agentData.forEach(agent => {
+            tr = document.createElement('tr'); tr.className = 'clickable-row'; tr.dataset.agentId = agent.agentId;
+            dataKeys.forEach(key => {
+              const td = document.createElement('td');
+              td.className = 'px-6 py-4 text-sm text-gray-700';
+              td.textContent = agent[key];
+              tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+            const detailsRow = document.createElement('tr'); detailsRow.className = 'details-row'; detailsRow.id = `details-${agent.agentId.replace(/[^a-zA-Z0-9]/g, '')}`;
+            const detailsCell = document.createElement('td'); detailsCell.colSpan = headers.length; detailsCell.className = 'p-2 bg-gray-50';
+            const agentTasks = taskData.filter(task => task.agentId === agent.agentId);
+            detailsCell.appendChild(createTable(null, ['Case ID', 'QA Feedback', 'Critical Errors', 'Non-Critical Errors', 'Quality'], agentTasks, ['caseId', 'qaFeedback', 'criticalErrors', 'nonCriticalErrors', 'qualityScore']));
+            detailsRow.appendChild(detailsCell); tbody.appendChild(detailsRow);
+          });
+        } else {
+          tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = headers.length; td.className = 'px-6 py-4 text-center text-gray-500'; td.textContent = 'No data available.'; tr.appendChild(td); tbody.appendChild(tr);
+        }
+        table.appendChild(thead); table.appendChild(tbody); tableContainer.appendChild(table);
+        table.querySelectorAll('.clickable-row').forEach(row => { row.addEventListener('click', (e) => { if (e.target.closest('table').parentNode.id === `details-${row.dataset.agentId.replace(/[^a-zA-Z0-9]/g, '')}`) return; const agentId = row.dataset.agentId.replace(/[^a-zA-Z0-9]/g, ''); const detailsRow = document.getElementById(`details-${agentId}`); detailsRow.classList.toggle('show'); }); });
+        return tableContainer;
+      }
+
+      function createReworkAgentPerformanceTable(agentData, taskData) {
+          const tableContainer = document.createElement('div');
+          tableContainer.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto';
+          const table = document.createElement('table');
+          table.className = 'min-w-full';
+          const thead = document.createElement('thead');
+          thead.className = 'bg-gray-50';
+          const headers = ['Agent ID', 'Number of Reworks', 'Valid', 'Invalid', 'Reworks w/ Critical', 'Reworks w / Non Critical'];
+          const dataKeys = ['agentId', 'numberOfReworks', 'valid', 'invalid', 'withCritical', 'withNonCritical'];
+          const tableId = 'reworkPerformanceByAgent';
+          let tr = document.createElement('tr');
+          headers.forEach((headerText, index) => {
+              const th = document.createElement('th');
+              const key = dataKeys[index];
+              th.className = 'px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sortable-header';
+              th.textContent = headerText;
+              th.onclick = () => handleSortClick(tableId, key);
+              const sortInfo = sortState[tableId];
+              if (sortInfo && sortInfo.key === key) {
+                  const arrow = document.createElement('span');
+                  arrow.className = 'sort-arrow';
+                  arrow.textContent = sortInfo.order === 'asc' ? '▲' : '▼';
+                  th.appendChild(arrow);
+              }
+              tr.appendChild(th);
+          });
+          thead.appendChild(tr);
+          const tbody = document.createElement('tbody');
+          tbody.className = 'divide-y divide-gray-200';
+          if (agentData && agentData.length > 0) {
+              agentData.forEach(agent => {
+                  tr = document.createElement('tr');
+                  tr.className = 'clickable-row';
+                  tr.dataset.agentId = agent.agentId;
+                  dataKeys.forEach(key => {
+                      const td = document.createElement('td');
+                      td.className = 'px-6 py-4 text-sm text-gray-700';
+                      td.textContent = agent[key];
+                      tr.appendChild(td);
+                  });
+                  tbody.appendChild(tr);
+                  const detailsRow = document.createElement('tr');
+                  detailsRow.className = 'details-row';
+                  detailsRow.id = `rework-details-${agent.agentId.replace(/[^a-zA-Z0-9]/g, '')}`;
+                  const detailsCell = document.createElement('td');
+                  detailsCell.colSpan = headers.length;
+                  detailsCell.className = 'p-2 bg-gray-50';
+                  const agentTasks = taskData.filter(task => task.agentId === agent.agentId);
+                  detailsCell.appendChild(createTable(null, ['Case ID', 'Rework Request', 'Critical Errors', 'Non-Critical Errors'], agentTasks, ['caseId', 'reworkRequest', 'criticalErrors', 'nonCriticalErrors']));
+                  detailsRow.appendChild(detailsCell);
+                  tbody.appendChild(detailsRow);
+              });
+          } else {
+              tr = document.createElement('tr');
+              const td = document.createElement('td');
+              td.colSpan = headers.length;
+              td.className = 'px-6 py-4 text-center text-gray-500';
+              td.textContent = 'No data available.';
+              tr.appendChild(td);
+              tbody.appendChild(tr);
+          }
+          table.appendChild(thead);
+          table.appendChild(tbody);
+          tableContainer.appendChild(table);
+          table.querySelectorAll('.clickable-row').forEach(row => {
+              row.addEventListener('click', (e) => {
+                  if (e.target.closest('table').parentNode.id === `rework-details-${row.dataset.agentId.replace(/[^a-zA-Z0-9]/g, '')}`) return;
+                  const agentId = row.dataset.agentId.replace(/[^a-zA-Z0-9]/g, '');
+                  const detailsRow = document.getElementById(`rework-details-${agentId}`);
+                  if (detailsRow) detailsRow.classList.toggle('show');
+              });
+          });
+          return tableContainer;
+      }
+
+      applyBtn.addEventListener('click', fetchData);
+      initialize();
+    });
+  </script>
+</body>
+</html>
+
