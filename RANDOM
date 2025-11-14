@@ -4,19 +4,7 @@ The script does not have permission to perform that action. Required permissions
 Close
 Total No. of dishes	Total No. of categories	Total no. of options	Total no. of option Groups	Total no. of tags	Total no. of timetables.	No of Valid Photos for Main dishes (Exlcuding Extras, drinks, sides etc.)
 
-POST https://script.google.com/a/cognizant.com/macros/s/AKfycbx9ASSyrAtTe43Hufhdlu-Hh_1ROSZFRRVKvmDWxqJrljPcM-7IzAEUvZU2ZU-VqpMv/callback?nocache_id=9&token=AJuLMu1IhRz0a02GjjWmeIMJuEkZiRPhgA%3A1763045899307 429 (Too Many Requests)
-Qv @ 542906410-warden_bin_i18n_warden.js:247
-wz.Bc @ 542906410-warden_bin_i18n_warden.js:355
-(anonymous) @ 542906410-warden_bin_i18n_warden.js:362
-uz @ 542906410-warden_bin_i18n_warden.js:363
-zz.ia @ 542906410-warden_bin_i18n_warden.js:357
-cA.v @ 542906410-warden_bin_i18n_warden.js:375
-fA @ 542906410-warden_bin_i18n_warden.js:379
-eA.C @ 542906410-warden_bin_i18n_warden.js:378Understand this error
-542906410-warden_bin_i18n_warden.js:164 Net state changed from BUSY to IDLE
-17686836-mae_html_user_bin_i18n_mae_html_user.js:316 Uncaught Xx {message: 'Error in protected function: NetworkError: Connection failure due to HTTP 429', cause: 'NetworkError: Connection failure due to HTTP 429', g: true, stack: 'CustomError: Error in protected function: NetworkE…6-mae_html_user_bin_i18n_mae_html_user.js:213:52)'}
-Xx @ 17686836-mae_html_user_bin_i18n_mae_html_user.js:316
-Wx @ 17686836-mae_html_user_bin_i18n_mae_html_user.js:314
-c @ 17686836-mae_html_user_bin_i18n_mae_html_user.js:313
-a @ 17686836-mae_html_user_bin_i18n_mae_html_user.js:213Understand this error
-17686836-mae_html_user_bin_i18n_mae_html_user.js:319  POST https://n-rjqxyomjpmdfk66kbx5lnbnwyph3wa6uzemknla-0lu-script.googleusercontent.com/jserror?script=https%3A%2F%2Fn-rjqxyomjpmdfk66kbx5lnbnwyph3wa6uzemknla-0lu-script.googleusercontent.com%2FuserCodeAppPanel%3FcreateOAuthDialog%3Dtrue&error=NetworkError%3A%20Connection%20failure%20due%20to%20HTTP%20429&line=Not%20available&errorSender_enqueueTimeMs=1763045909791&errorSenderType=MemoryErrorSender 429 (unknown)
+A critical error occurred during the archive WORKER operation: Could not retrieve the manifest for job type "Main Task". The data may have expired. 
+Stack: Error: Could not retrieve the manifest for job type "Main Task". The data may have expired.
+    at processArchiveExportStep (Code:4720:15)
+    at __GS_INTERNAL_top_function_call__.gs:1:8
